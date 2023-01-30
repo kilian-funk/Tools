@@ -1,0 +1,49 @@
+#!/bin/bash
+
+scan_batch() {
+    scanimage -b --batch-print \
+        --source ADF \
+        --format png \
+        --mode Gray \
+        --resolution 100 \
+        --brightness 444400 \
+        --batch-start $BATCH_START \
+        --batch-increment $BATCH_INC \
+        -y 296.926mm \
+        -d hpaio:/net/hp_color_laserjet_mfp_m277dw?ip=192.168.178.30&queue=false 
+
+    while [ $(ps | grep scanimage | wc -l) -ge 1 ]; do
+    sleep .1
+    done
+}
+
+TEMPDIR=/tmp/scan
+CWD=$(pwd)
+
+mkdir -p $TEMPDIR
+cd $TEMPDIR
+rm -f *
+BATCH_INC="1"
+BATCH_START="1"
+
+if [ $1 -eq "-2" ]; then
+    BATCH_INC="2"
+    shift
+fi
+
+scan_batch
+
+if [ $BATCH_INC -eq "2" ]; then
+    echo "Blätter umgekehrt nochmal einlegen"
+
+    read void
+
+    BATCH_START=$(( $(ls | wc -l)*2 ))
+    BATCH_INC="-2"
+    scan_batch
+fi
+
+
+convert *.png out_raw.pdf || exit 1
+cd $CWD
+ocrmypdf $TEMPDIR/out_raw.pdf $1.pdf || exit 1
